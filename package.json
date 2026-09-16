@@ -6,8 +6,14 @@
   "author": "amiof",
   "scripts": {
     "dev": "plasmo dev",
+    "dev:chrome": "plasmo dev --target=chrome-mv3",
+    "dev:firefox": "plasmo dev --target=firefox-mv3",
     "build": "plasmo build",
-    "package": "plasmo package"
+    "build:chrome": "plasmo build --target=chrome-mv3",
+    "build:firefox": "plasmo build --target=firefox-mv3",
+    "package": "plasmo package",
+    "package:chrome": "plasmo package --target=chrome-mv3",
+    "package:firefox": "plasmo package --target=firefox-mv3"
   },
   "dependencies": {
     "plasmo": "0.90.5",
@@ -24,8 +30,20 @@
     "typescript": "5.3.3"
   },
   "manifest": {
+    "permissions": [
+      "contextMenus",
+      "downloads",
+      "storage"
+    ],
     "host_permissions": [
-      "https://*/*"
-    ]
+      "https://*/*",
+      "http://127.0.0.1:3325/*"
+    ],
+    "browser_specific_settings": {
+      "gecko": {
+        "id": "shabdiz@amiof",
+        "strict_min_version": "109.0"
+      }
+    }
   }
 }
