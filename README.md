@@ -72,10 +72,24 @@ Load the matching dev build (`build/chrome-mv3-dev` or `build/firefox-mv3-dev`) 
 
 ```
 src/
-├── background.ts    # Service worker: intercepts downloads, context menu, header capture
-├── popup.tsx        # Toolbar popup: ON/OFF switch + app reachability indicator
+├── background.ts             # Service worker entry: wires all chrome.* listeners
+├── background/
+│   ├── logger.ts             # DEBUG flag + log()
+│   ├── urls.ts               # URL helpers, forwardable-scheme check
+│   ├── browserApi.ts         # invokeDownloads(): Chrome/Firefox-safe downloads API wrapper
+│   ├── requestCache.ts       # webRequest header cache (TTL + prune) and its registration
+│   ├── headerProbe.ts        # page-context fetch probe (headers for right-click downloads)
+│   ├── contextMenu.ts        # "Download with Shabdiz" menu, pending-download tracking
+│   ├── interception.ts       # onCreated flow: pause → send → cancel → erase
+│   └── appStatus.ts          # popup ping handler + enabled/disabled change logging
+├── popup.tsx                 # Toolbar popup: ON/OFF switch + app reachability indicator
 └── lib/
-    └── shabdiz.ts   # Payload contract, the shared payload builder, POST to Shabdiz
+    ├── shabdiz.ts            # Public API barrel (import from here)
+    └── shabdiz/
+        ├── types.ts          # Constants + payload type contract
+        ├── headers.ts        # Header lookup/parsing helpers
+        ├── payload.ts        # buildShabdizPayload() — the single payload builder
+        └── client.ts         # isShabdizEnabled(), sendToShabdiz()
 ```
 
 Both code paths — automatic interception and the right-click menu — build their payload
