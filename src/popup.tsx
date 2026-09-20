@@ -1,5 +1,10 @@
 import { useEffect, useState } from "react"
-import { SHABDIZ_ENABLED_KEY, isShabdizEnabled } from "~lib/shabdiz"
+
+import {
+  isShabdizEnabled,
+  SHABDIZ_ENABLED_KEY,
+  SHABDIZ_PING_MESSAGE
+} from "~lib/shabdiz"
 
 const GRADIENT_BG =
   "radial-gradient(circle at 15% 10%, rgba(59, 130, 246, .18), transparent 30%), " +
@@ -8,6 +13,7 @@ const GRADIENT_BG =
 
 function IndexPopup() {
   const [enabled, setEnabled] = useState<boolean | null>(null)
+  const [appReachable, setAppReachable] = useState<boolean | null>(null)
 
   // Set body to a solid dark color so the rounded inner div stands out.
   useEffect(() => {
@@ -32,6 +38,36 @@ function IndexPopup() {
 
     chrome.storage.onChanged.addListener(listener)
     return () => chrome.storage.onChanged.removeListener(listener)
+  }, [])
+
+  // Poll the background so a failed send is visibly "the app is not running"
+  // rather than a mystery.
+  useEffect(() => {
+    let cancelled = false
+
+    const check = () => {
+      chrome.runtime.sendMessage(
+        { type: SHABDIZ_PING_MESSAGE },
+        (response: { reachable?: boolean } | undefined) => {
+          if (cancelled) return
+
+          if (chrome.runtime.lastError) {
+            setAppReachable(false)
+            return
+          }
+
+          setAppReachable(Boolean(response?.reachable))
+        }
+      )
+    }
+
+    check()
+    const interval = setInterval(check, 5000)
+
+    return () => {
+      cancelled = true
+      clearInterval(interval)
+    }
   }, [])
 
   const toggle = () => {
@@ -115,6 +151,37 @@ function IndexPopup() {
           ? "Downloads are sent to the Shabdiz app."
           : "Downloads are handled by the browser."}
       </p>
+
+      <div
+        style={{
+          display: "flex",
+          alignItems: "center",
+          gap: 8,
+          marginTop: 10
+        }}>
+        <span
+          aria-hidden="true"
+          style={{
+            width: 8,
+            height: 8,
+            borderRadius: "50%",
+            flexShrink: 0,
+            background:
+              appReachable === null
+                ? "#64748b"
+                : appReachable
+                  ? "#4ade80"
+                  : "#f87171"
+          }}
+        />
+        <span style={{ fontSize: 11, color: "#94a3b8" }}>
+          {appReachable === null
+            ? "Checking the Shabdiz app\u2026"
+            : appReachable
+              ? "Shabdiz app connected"
+              : "Shabdiz app not running"}
+        </span>
+      </div>
     </div>
   )
 }

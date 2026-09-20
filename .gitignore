@@ -30,4 +30,7 @@ dist/
 .plasmo
 
 # typescript
-.tsbuildinfo
+*.tsbuildinfo
+
+# tooling
+.freebuff/
