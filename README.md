@@ -12,6 +12,63 @@ This extension watches downloads in your browser and forwards them to the Shabdi
 - **Popup switch** — A popup in the toolbar has an ON/OFF switch. Turning it off means downloads behave normally (handled by the browser); turning it on restores interception. The popup also shows whether the desktop app is reachable.
 - **Local only** — The extension only talks to `http://127.0.0.1:3325` where the Shabdiz desktop app listens. Nothing is sent anywhere else.
 
+## How a download flows
+
+```mermaid
+flowchart TD
+    User([User])
+
+    subgraph Browser["Web Browser"]
+        Page[Web Page]
+        Request[HTTP Request]
+        Response[HTTP Response]
+        Download[Browser Download]
+    end
+
+    subgraph Extension["Shabdiz Browser Extension"]
+        WR[webRequest]
+        ReqCache[(Request Cache)]
+        ResCache[(Response Cache)]
+        Probe[Page Header Probe]
+        Match[Match Download ↔ Request]
+        Payload[Build Shabdiz Payload]
+        Control[Pause / Resume / Cancel]
+    end
+
+    subgraph Shabdiz["Shabdiz Desktop"]
+        API["HTTP API<br/>127.0.0.1:3325/download"]
+        Engine[Download Engine]
+    end
+
+    User --> Page
+    Page --> Request
+    Request --> WR
+
+    WR --> ReqCache
+    WR --> Response
+    Response --> ResCache
+
+    Page --> Download
+    Download --> WR
+
+    ReqCache --> Match
+    ResCache --> Match
+    Download --> Match
+
+    Match --> Payload
+
+    Payload --> Control
+    Control --> API
+
+    API --> Engine
+
+    Control -->|Success| Cancel[Cancel + Erase Browser Download]
+    Control -->|Failure / Timeout| Resume[Resume Browser Download]
+
+    User -->|Right Click → Download with Shabdiz| Probe
+    Probe --> Request
+```
+
 ## Supported browsers
 
 | Browser             | Support                                                                        |
