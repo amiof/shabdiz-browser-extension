@@ -68,6 +68,64 @@ flowchart TD
     User -->|Right Click → Download with Shabdiz| Probe
     Probe --> Request
 ```
+### create Payload
+---
+```mermaid
+flowchart LR
+    A[Browser Download] --> D[buildShabdizPayload]
+    B[Cached Request] --> D
+    C[Cached Response] --> D
+    E[Context Menu Info] --> D
+
+    A --> A1[URL]
+    A --> A2[Filename]
+    A --> A3[MIME Type]
+    A --> A4[Download State]
+
+    B --> B1[Cookie]
+    B --> B2[Referer]
+    B --> B3[User-Agent]
+    B --> B4[Authorization]
+    B --> B5[Other Request Headers]
+
+    C --> C1[Content-Length]
+    C --> C2[Content-Type]
+    C --> C3[Content-Disposition]
+    C --> C4[HTTP Status]
+
+    E --> E1[Page URL]
+    E --> E2[Link URL]
+    E --> E3[Source / Context]
+
+    D --> F[ShabdizDownloadPayload]
+```
+### Browser Integration
+---
+```mermaid
+flowchart TD
+    A[Browser] --> B[webRequest]
+
+    B --> C[Request Cache]
+    B --> D[Response Cache]
+
+    A --> E[chrome.downloads.onCreated]
+
+    C --> E
+    D --> E
+
+    E --> F[findCachedRequest]
+    F --> G[buildShabdizPayload]
+
+    G --> H[Pause Browser Download]
+    H --> I[POST /download]
+    I --> J[Shabdiz Desktop App]
+    J --> K[Download Engine]
+
+    I -->|Success| L[Cancel Browser Download]
+    L --> M[Erase Download Record]
+
+    I -->|Failure / Timeout| N[Resume Browser Download]
+```
 
 ## Supported browsers
 
