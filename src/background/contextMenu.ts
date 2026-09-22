@@ -7,7 +7,11 @@ import {
 import { invokeDownloads } from "./browserApi"
 import { probeHeadersFromPage } from "./headerProbe"
 import { log } from "./logger"
-import { findCachedByCandidates, getCachedResponse } from "./requestCache"
+import {
+  findCachedByCandidates,
+  getCachedResponse,
+  resolveRedirect
+} from "./requestCache"
 import { candidateUrlsFor, isForwardableUrl, normalizeUrl } from "./urls"
 
 export const CONTEXT_MENU_ID = "shabdiz-download"
@@ -111,19 +115,27 @@ async function startBrowserDownload(
 async function sendContextFallback(
   pending: PendingContextDownload
 ): Promise<void> {
-  const cachedRequest = findCachedByCandidates([pending.normalizedUrl])
-  const responseInfo = cachedRequest
-    ? getCachedResponse(cachedRequest.requestId)
+  const initialCached = findCachedByCandidates([pending.normalizedUrl])
+  const initialResponse = initialCached
+    ? getCachedResponse(initialCached.requestId)
     : undefined
+
+  const resolved = resolveRedirect(
+    pending.url,
+    initialCached,
+    initialResponse
+  )
 
   const payload = buildShabdizPayload(
     { url: pending.url, state: "in_progress" },
     {
       source: "context-menu",
       explicit: true,
-      cachedRequest,
-      responseInfo,
-      contextInfo: pending.info
+      cachedRequest: resolved.cachedRequest,
+      responseInfo: resolved.responseInfo,
+      contextInfo: pending.info,
+      overrideUrl:
+        resolved.url !== pending.url ? resolved.url : undefined
     }
   )
 

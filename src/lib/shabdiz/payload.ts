@@ -4,7 +4,11 @@ import {
   findHeader,
   headersToObject
 } from "./headers"
-import type { BuildPayloadOptions, ShabdizDownloadPayload } from "./types"
+import type {
+  BuildPayloadOptions,
+  RequestHeader,
+  ShabdizDownloadPayload
+} from "./types"
 
 /** First value that is a non-empty string. */
 function firstNonEmpty(
@@ -15,6 +19,29 @@ function firstNonEmpty(
   }
 
   return undefined
+}
+
+/**
+ * Request headers worth forwarding to the app. Everything else (Host,
+ * Sec-Fetch-*, Accept-Encoding, Connection, ...) is noise for a download
+ * manager: the download engine derives those from the URL itself.
+ */
+const FORWARD_HEADERS = new Set([
+  "user-agent",
+  "referer",
+  "cookie",
+  "authorization",
+  "accept",
+  "origin"
+])
+
+/** Keep only the headers the app should forward to the download engine. */
+function forwardableHeaders(headers: RequestHeader[]): RequestHeader[] {
+  return headers.filter(
+    (header) =>
+      typeof header?.name === "string" &&
+      FORWARD_HEADERS.has(header.name.toLowerCase())
+  )
 }
 
 /** First value that is a positive, finite number. */
@@ -39,13 +66,15 @@ export function buildShabdizPayload(
   download: any,
   options: BuildPayloadOptions
 ): ShabdizDownloadPayload {
-  const url: string = typeof download?.url === "string" ? download.url : ""
+  const url: string =
+    options.overrideUrl ??
+    (typeof download?.url === "string" ? download.url : "")
 
   const cachedRequest = options.cachedRequest ?? null
   const responseInfo = options.responseInfo ?? null
   const contextInfo = options.contextInfo ?? {}
 
-  const headers = cachedRequest?.requestHeaders ?? []
+  const headers = forwardableHeaders(cachedRequest?.requestHeaders ?? [])
   const responseHeaders = responseInfo?.headers ?? []
 
   // Derive these from the response headers rather than trusting the caller to
@@ -101,7 +130,10 @@ export function buildShabdizPayload(
     contentDisposition,
     status: responseInfo?.statusCode,
 
-    request: cachedRequest ?? undefined,
+    request:
+      cachedRequest
+        ? { ...cachedRequest, requestHeaders: headers }
+        : undefined,
     download: download ?? undefined
   }
 

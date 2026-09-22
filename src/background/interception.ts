@@ -11,7 +11,11 @@ import {
   type PendingContextDownload
 } from "./contextMenu"
 import { log } from "./logger"
-import { findCachedRequest, getCachedResponse } from "./requestCache"
+import {
+  findCachedRequest,
+  getCachedResponse,
+  resolveRedirect
+} from "./requestCache"
 import { isForwardableUrl } from "./urls"
 
 /** Chrome-only: removes the entry so a restart cannot restore and re-send it. */
@@ -49,17 +53,24 @@ export async function handleDownloadCreated(download: any): Promise<void> {
     return
   }
 
-  const cachedRequest = findCachedRequest(download)
-  const responseInfo = cachedRequest
-    ? getCachedResponse(cachedRequest.requestId)
+  const initialCached = findCachedRequest(download)
+  const initialResponse = initialCached
+    ? getCachedResponse(initialCached.requestId)
     : undefined
+
+  const resolved = resolveRedirect(
+    download.url,
+    initialCached,
+    initialResponse
+  )
 
   const payload: ShabdizDownloadPayload = buildShabdizPayload(download, {
     source: explicit ? "context-menu" : "auto",
     explicit,
-    cachedRequest,
-    responseInfo,
-    contextInfo: pending?.info
+    cachedRequest: resolved.cachedRequest,
+    responseInfo: resolved.responseInfo,
+    contextInfo: pending?.info,
+    overrideUrl: resolved.url !== download.url ? resolved.url : undefined
   })
 
   log("Forwarding download:", {

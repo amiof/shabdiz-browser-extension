@@ -226,6 +226,127 @@ export function responseForUrl(
   return item ? getCachedResponse(item.requestId) : undefined
 }
 
+const REDIRECT_STATUSES = new Set([301, 302, 307, 308])
+
+/**
+ * Strip headers that belong to the wrong domain after a redirect and update
+ * Host to match the target. The page probe's fetch() produces headers like
+ * Cookie/Sec-Fetch-* that are meaningless (or harmful) for the redirect
+ * target, and the Host header still points at the original server.
+ */
+function fixHeadersForRedirect(
+  cachedRequest: CachedRequest,
+  targetUrl: string
+): CachedRequest {
+  let targetHost: string
+  let targetOrigin: string
+  try {
+    const parsed = new URL(targetUrl)
+    targetHost = parsed.host
+    targetOrigin = parsed.origin
+  } catch {
+    targetHost =
+      cachedRequest.requestHeaders.find(
+        (h) => h.name.toLowerCase() === "host"
+      )?.value ?? ""
+    targetOrigin = ""
+  }
+
+  // Detect whether the redirect stays on the same origin.  Same-origin
+  // redirects (e.g. example.com/download?file=x → example.com/files/x.zip)
+  // need cookies for authentication; cross-origin redirects (e.g. GitHub
+  // releases → release-assets.githubusercontent.com) should not forward
+  // cookies because they belong to the original domain.
+  let originalOrigin = ""
+  try {
+    originalOrigin = new URL(cachedRequest.url).origin
+  } catch {
+    // ignore
+  }
+
+  const sameOrigin =
+    targetOrigin !== "" &&
+    originalOrigin !== "" &&
+    targetOrigin === originalOrigin
+
+  const fixed = cachedRequest.requestHeaders
+    .filter((h) => {
+      const lower = h.name.toLowerCase()
+      if (lower === "host") return false
+      // Strip cookies only on cross-origin redirects — same-origin needs
+      // them for auth.
+      if (lower === "cookie" && !sameOrigin) return false
+      return true
+    })
+    .concat([{ name: "Host", value: targetHost }])
+
+  return { ...cachedRequest, requestHeaders: fixed }
+}
+
+/**
+ * If the cached response is an HTTP redirect, resolve the real download URL
+ * by looking up cached data for the Location target. Critical for GitHub
+ * release downloads where the page URL returns a 302 to the actual asset host.
+ */
+export function resolveRedirect(
+  url: string,
+  cachedRequest: CachedRequest | null,
+  responseInfo: ShabdizResponseInfo | undefined
+): {
+  url: string
+  cachedRequest: CachedRequest | null
+  responseInfo: ShabdizResponseInfo | undefined
+} {
+  if (!responseInfo || !cachedRequest) {
+    return { url, cachedRequest, responseInfo }
+  }
+
+  if (!REDIRECT_STATUSES.has(responseInfo.statusCode ?? 0)) {
+    return { url, cachedRequest, responseInfo }
+  }
+
+  const location = findHeader(responseInfo.headers, "location")?.value
+  if (!location) {
+    return { url, cachedRequest, responseInfo }
+  }
+
+  const normalizedLocation = normalizeUrl(location)
+  const redirectCached = findCachedByCandidates([normalizedLocation])
+
+  if (!redirectCached) {
+    // No cached data for the target — still swap the URL and fix the
+    // headers so the app can follow the redirect.
+    return {
+      url: location,
+      cachedRequest: fixHeadersForRedirect(cachedRequest, location),
+      responseInfo
+    }
+  }
+
+  const redirectResponse = getCachedResponse(redirectCached.requestId)
+
+  if (
+    redirectResponse &&
+    redirectResponse.statusCode &&
+    redirectResponse.statusCode >= 200 &&
+    redirectResponse.statusCode < 300
+  ) {
+    return {
+      url: redirectCached.url,
+      cachedRequest: fixHeadersForRedirect(redirectCached, redirectCached.url),
+      responseInfo: redirectResponse
+    }
+  }
+
+  // The redirect target didn't return a success response yet — use its URL
+  // and fix the headers so Host/Cookie are correct.
+  return {
+    url: redirectCached.url,
+    cachedRequest: fixHeadersForRedirect(redirectCached, redirectCached.url),
+    responseInfo: redirectResponse
+  }
+}
+
 function addListenerSafely(
   event: any,
   handler: (details: any) => void,

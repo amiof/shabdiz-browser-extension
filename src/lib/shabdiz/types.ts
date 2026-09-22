@@ -88,4 +88,6 @@ export type BuildPayloadOptions = {
   cachedRequest?: CachedRequestInfo | null
   responseInfo?: ShabdizResponseInfo | null
   contextInfo?: ShabdizContextInfo
+  /** Override the download URL (e.g., after resolving a redirect). */
+  overrideUrl?: string
 }
