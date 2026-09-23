@@ -1,7 +1,7 @@
 {
   "name": "shabdiz-dm-extension",
   "displayName": "Shabdiz download manager extension",
-  "version": "0.0.1",
+  "version": "1.0.0",
   "description": "this extension send downloads link to shabdiz download manager app",
   "author": "amiof",
   "scripts": {
